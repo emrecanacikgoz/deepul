@@ -1,5 +1,7 @@
 from .utils import *
 
+from deepul.models.vqvae import VQVAE
+
 
 # Question 1
 def q1_sample_data_1():
@@ -256,7 +258,7 @@ def q2c_save_results(q2_c, train_data, test_data):
                        f'results/q3_{part}_dset{dset_type}_train_plot.png')
     show_samples(samples, f'results/q3_{part}_dset{dset_type}_samples.png') """
 
-
+"""
 def visualize_q3b_data(dset_type):
     data_dir = get_data_dir(1)
     if dset_type == 1:
@@ -340,3 +342,144 @@ def q4c_save_results(q4_c):
     save_training_plot(train_losses, test_losses, f'Q4(c) Train Plot',
                        f'results/q4_c_train_plot.png')
     show_samples(samples, f'results/q4_c_samples.png')
+"""
+
+# Question 3
+def q3ab_save_results(dset_type, part, fn):
+    if part == "a":
+        dataset_suffix = ""
+        channel = 1
+    elif part == "b":
+        dataset_suffix = "_colored"
+        channel = 3
+    else:
+        raise Exception("Invalid part:", part, "Must be 'a' or 'b'")
+
+    data_dir = get_data_dir(1)
+    if dset_type == 1:
+        train_data, test_data = load_pickled_data(
+            join(data_dir, f"shapes{dataset_suffix}.pkl")
+        )
+        img_shape = (20, 20, channel)
+    elif dset_type == 2:
+        train_data, test_data = load_pickled_data(
+            join(data_dir, f"mnist{dataset_suffix}.pkl")
+        )
+        img_shape = (28, 28, channel)
+    else:
+        raise Exception()
+
+    train_losses, test_losses, samples = fn(train_data, test_data, img_shape, dset_type)
+    samples = samples.astype("float32") / channel * 255
+
+    print(f"Final Test Loss: {test_losses[-1]:.4f}")
+    save_training_plot(
+        train_losses,
+        test_losses,
+        f"Q3({part}) Dataset {dset_type} Train Plot",
+        f"results/q3_{part}_dset{dset_type}_train_plot.png",
+    )
+    show_samples(samples, f"results/q3_{part}_dset{dset_type}_samples.png")
+
+
+def q3c_save_results(dset_type, fn):
+    data_dir = get_data_dir(1)
+    if dset_type == 1:
+        train_data, test_data = load_pickled_data(
+            join(data_dir, f"shapes_colored.pkl")
+        )
+        img_shape = (20, 20, 3)
+    elif dset_type == 2:
+        train_data, test_data = load_pickled_data(
+            join(data_dir, f"mnist_colored.pkl")
+        )
+        img_shape = (28, 28, 3)
+    else:
+        raise Exception()
+
+    (
+        time_list_no_cache,
+        time_list_with_cache,
+        samples_no_cache,
+        samples_with_cache,
+    ) = fn(train_data, test_data, img_shape, dset_type)
+    samples_no_cache = samples_no_cache.astype("float32") / 3 * 255
+    samples_with_cache = samples_with_cache.astype("float32") / 3 * 255
+
+    save_timing_plot(
+        time_list_no_cache,
+        time_list_with_cache,
+        "Q3(c) Timing Plot",
+        f"results/q3_c_dset{dset_type}_timing_plot.png",
+        time1_label="no cache",
+        time2_label="with cache",
+    )
+    show_samples(samples_no_cache, f"results/q3_c_no_cache_dset{dset_type}_samples.png")
+    show_samples(
+        samples_with_cache, f"results/q3_c_with_cache_dset{dset_type}_samples.png"
+    )
+
+    # bonus
+
+    # load vqvae mode
+def load_pretrain_vqvae(name: str):
+    data_dir = get_data_dir(1)
+    loaded_args = torch.load(join(data_dir, f"vqvae_args_{name}_ft" + ".pth"))
+    vqvae = VQVAE(**loaded_args)
+    vqvae.load_state_dict(torch.load(join(data_dir, f"vqvae_{name}_ft" + ".pth")))
+    return vqvae
+
+
+def bonusa_save_results(dset_type, fn):
+    data_dir = get_data_dir(1)
+    if dset_type == 1:
+        #  @ load colored mnist
+        train_data, _ = load_pickled_data(join(data_dir, "mnist_colored.pkl"))
+        img_shape = (28, 28, 3)
+        vqvae = load_pretrain_vqvae("colored_mnist")
+    elif dset_type == 2:
+        train_data, _, _, _ = load_colored_mnist_text(
+            join(data_dir, "colored_mnist_with_text.pkl")
+        )
+        img_shape = (28, 28, 3)
+        vqvae = load_pretrain_vqvae("colored_mnist_2")
+    else:
+        raise Exception()
+
+    # get two images
+    images = train_data[:2]
+    post_decoded_images = fn(images, vqvae)
+    stacked_images = np.concatenate([images, post_decoded_images], axis=0)
+
+    vq_images = stacked_images.astype("float32") / 3 * 255
+    show_samples(vq_images, f"results/q4_a_dset{dset_type}_samples.png", nrow=2)
+
+def bonusb_save_results(dset_type, fn):
+    data_dir = get_data_dir(1)
+    if dset_type == 1:
+        #  @ load colored mnist
+        train_data, test_data = load_pickled_data(join(data_dir, "mnist_colored.pkl"))
+        img_shape = (28, 28, 3)
+        vqvae = load_pretrain_vqvae("colored_mnist")
+    elif dset_type == 2:
+        train_data, test_data, _, _ = load_colored_mnist_text(
+            join(data_dir, "colored_mnist_with_text.pkl")
+        )
+        img_shape = (28, 28, 3)
+        vqvae = load_pretrain_vqvae("colored_mnist_2")
+    else:
+        raise Exception()
+
+    train_losses, test_losses, samples = fn(train_data, test_data, img_shape, dset_type, vqvae)
+
+    # decode? TODO
+    samples = samples.astype("float32") / 3 * 255
+
+    print(f"Final Test Loss: {test_losses[-1]:.4f}")
+    save_training_plot(
+        train_losses,
+        test_losses,
+        f"Qb(a) Dataset {dset_type} Train Plot",
+        f"results/q4_b_dset{dset_type}_train_plot.png",
+    )
+    show_samples(samples, f"results/q4_b_dset{dset_type}_samples.png")

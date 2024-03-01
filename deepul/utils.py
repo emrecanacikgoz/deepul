@@ -163,3 +163,47 @@ def get_data_dir(hw_number):
 def quantize(images, n_bits):
     images = np.floor(images / 256. * 2 ** n_bits)
     return images.astype('uint8')
+
+
+def save_timing_plot(
+    time_1: np.ndarray,
+    time_2: np.ndarray,
+    title: str,
+    fname: str,
+    time1_label: str,
+    time2_label: str,
+) -> None:
+    plt.figure()
+
+    plt.plot(time_1, label=time1_label)
+    plt.plot(time_2, label=time2_label)
+    plt.legend()
+    plt.title(title)
+    plt.xlabel("sample step")
+    plt.ylabel("seconds")
+    savefig(fname)
+
+
+def load_colored_mnist_text(file_path):
+    """
+    Load colored MNIST data from a pickle file.
+
+    Parameters:
+    file_path (str): Path to the pickle file containing the dataset.
+
+    Returns:
+    tuple: Tuple containing training and test datasets.
+    """
+    with open(file_path, "rb") as f:
+        (
+            colored_train_data,
+            colored_test_data,
+            colored_train_labels,
+            colored_test_labels,
+        ) = pickle.load(f)
+    return (
+        colored_train_data,
+        colored_test_data,
+        colored_train_labels,
+        colored_test_labels,
+    )
